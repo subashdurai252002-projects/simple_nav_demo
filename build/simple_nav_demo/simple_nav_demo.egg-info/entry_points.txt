@@ -1,0 +1,4 @@
+[console_scripts]
+mission_node = simple_nav_demo.mission_node:main
+navigator_node = simple_nav_demo.navigator_node:main
+
