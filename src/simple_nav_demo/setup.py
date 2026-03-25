@@ -26,6 +26,8 @@ setup(
         'console_scripts': [
             'navigator_node = simple_nav_demo.navigator_node:main',
             'mission_node = simple_nav_demo.mission_node:main',
+            'robot_pose_node = simple_nav_demo.robot_pose_node:main',
+            'visualizer_node = simple_nav_demo.visualizer_node:main',
         ],
     },
 )

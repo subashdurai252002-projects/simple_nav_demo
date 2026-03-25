@@ -8,8 +8,8 @@ class MissionNode(Node):
     def __init__(self):
         super().__init__('mission_node')
 
-        self.goal_publisher = self.create_publisher(Pose2D, '/goal_pose', 10)
-        self.status_subscriber = self.create_subscription(
+        self.goal_pub = self.create_publisher(Pose2D, '/goal_pose', 10)
+        self.status_sub = self.create_subscription(
             String,
             '/nav_status',
             self.status_callback,
@@ -17,48 +17,58 @@ class MissionNode(Node):
         )
 
         self.goals = [
-            ('A', 2.0, 0.0, 0.0),
-            ('B', 2.0, 2.0, 0.0),
-            ('Origin', 0.0, 0.0, 0.0)
+            ('A', 2.0, 0.0),
+            ('B', 2.0, 2.0),
+            ('Origin', 0.0, 0.0),
         ]
 
         self.current_goal_index = 0
         self.waiting_for_reached = False
+        self.mission_done = False
+        self.last_status = None
 
-        self.timer = self.create_timer(1.0, self.start_mission)
+        self.timer = self.create_timer(0.5, self.publish_current_goal)
 
         self.get_logger().info('Mission node started')
 
-    def start_mission(self):
-        if not self.waiting_for_reached and self.current_goal_index < len(self.goals):
-            self.publish_goal()
+    def publish_current_goal(self):
+        if self.mission_done:
+            return
+
+        if self.current_goal_index >= len(self.goals):
+            self.get_logger().info('Mission completed')
+            self.mission_done = True
+            return
+
+        goal_name, x, y = self.goals[self.current_goal_index]
+
+        goal_msg = Pose2D()
+        goal_msg.x = x
+        goal_msg.y = y
+        goal_msg.theta = 0.0
+
+        self.goal_pub.publish(goal_msg)
+
+        if not self.waiting_for_reached:
+            self.get_logger().info(f'Published goal: {goal_name} ({x}, {y})')
             self.waiting_for_reached = True
-            self.timer.cancel()
-
-    def publish_goal(self):
-        name, x, y, theta = self.goals[self.current_goal_index]
-
-        msg = Pose2D()
-        msg.x = x
-        msg.y = y
-        msg.theta = theta
-
-        self.goal_publisher.publish(msg)
-        self.get_logger().info(f'Published goal: {name} ({x}, {y})')
 
     def status_callback(self, msg):
+        if msg.data == self.last_status:
+            return
+
+        self.last_status = msg.data
+
         if msg.data == 'reached' and self.waiting_for_reached:
-            reached_name = self.goals[self.current_goal_index][0]
-            self.get_logger().info(f'Reached goal: {reached_name}')
+            goal_name, _, _ = self.goals[self.current_goal_index]
+            self.get_logger().info(f'Reached goal: {goal_name}')
 
             self.current_goal_index += 1
             self.waiting_for_reached = False
 
-            if self.current_goal_index < len(self.goals):
-                self.publish_goal()
-                self.waiting_for_reached = True
-            else:
+            if self.current_goal_index >= len(self.goals):
                 self.get_logger().info('Mission completed')
+                self.mission_done = True
 
 
 def main(args=None):
